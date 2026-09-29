@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#173049">
+<title>Photo Gallery — Jayden Cho</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%231f5c4a'/%3E%3Ctext x='32' y='44' text-anchor='middle' font-family='Georgia' font-size='34' fill='%23f5ebd5'%3EJC%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IM+Fell+DW+Pica:ital@0;1&family=Special+Elite&family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#efe7d4;--ink:#272720;--green:#1f5c4a;--navy:#173049;--mint:#9fd6bd;--texture:url('images/paper-texture.jpg');--serif:'IM Fell DW Pica',Georgia,serif;--type:'Special Elite','Courier New',monospace;--body:'Libre Franklin',Arial,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--navy) var(--texture) center/800px;background-blend-mode:multiply;color:#e3eef0;font:400 16px/1.65 var(--body)}
+img{display:block;max-width:100%;height:auto}
+a{color:inherit}
+:focus-visible{outline:3px solid #2f8f6b;outline-offset:4px}
+.wrap{width:min(1140px,calc(100% - 48px));margin:auto}
+.site-header{position:sticky;top:0;z-index:40;background:#f1eadb;color:var(--ink);border-bottom:1px solid #8e7d65;box-shadow:0 2px 10px #221b1210}
+.header-inner{min-height:72px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.wordmark{text-decoration:none;display:flex;align-items:center;gap:11px}
+.monogram{font:400 33px/1 var(--serif);border-right:1px solid #877b66;padding-right:13px}
+.wordmark span:last-child{font:11px/1.3 var(--type);letter-spacing:.6px}
+.back{font-size:14px;font-weight:500;text-decoration:none;border:1px solid var(--ink);padding:9px 14px}
+.back:hover{background:var(--green);border-color:var(--green);color:#f1eadb}
+.head{padding:64px 0 22px;border-bottom:1px solid #9fb8c488}
+.eyebrow{font:12px/1.6 var(--type);letter-spacing:1.4px;text-transform:uppercase;color:var(--mint)}
+h1{font:400 clamp(48px,6vw,74px)/1 var(--serif);letter-spacing:-2px;margin:12px 0 0}
+.grid{columns:3 260px;column-gap:28px;padding:48px 0 90px}
+.grid button{display:block;width:100%;margin:0 0 30px;padding:11px 11px 18px;border:0;cursor:zoom-in;break-inside:avoid;background:#e8dcba var(--texture) center/430px;background-blend-mode:multiply;box-shadow:3px 6px 12px #0a1a2a4f;transform:rotate(var(--tilt,0deg));transition:transform .25s,box-shadow .25s}
+.grid button:nth-child(4n+1){--tilt:-2deg}.grid button:nth-child(4n+2){--tilt:1.5deg}.grid button:nth-child(4n+3){--tilt:-1deg}.grid button:nth-child(4n){--tilt:2deg}
+.grid button:hover{transform:translateY(-6px) rotate(0);box-shadow:5px 12px 22px #0a1a2a66}
+.grid img{width:100%}
+.empty{font:14px var(--type);padding:40px 0}
+.viewer{border:0;padding:0;background:transparent;width:100vw;height:100vh;max-width:100vw;max-height:100vh}
+.viewer::backdrop{background:#0b1620f2}
+.viewer img{position:absolute;inset:0;margin:auto;max-width:calc(100vw - 160px);max-height:calc(100vh - 90px)}
+.viewer button{position:absolute;border:1px solid #cab994;background:transparent;color:#f2e5ca;font:14px var(--body);padding:10px 14px;min-height:44px;cursor:pointer}
+.viewer button:hover{background:#f2e5ca;color:#231e1b}
+.close{top:16px;right:16px}.prev{left:16px;top:50%;transform:translateY(-50%)}.next{right:16px;top:50%;transform:translateY(-50%)}
+.count{position:absolute;top:26px;left:24px;font:13px var(--type);color:#cab994}
+@media(max-width:700px){.wordmark span:last-child{display:none}.head{padding-top:44px}.grid{column-gap:16px}.grid button{margin-bottom:20px;padding:8px 8px 14px}.viewer img{max-width:calc(100vw - 20px);max-height:calc(100vh - 160px)}.prev,.next{top:auto;bottom:20px;transform:none}}
+@media(prefers-reduced-motion:reduce){.grid button{transition:none}}
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap header-inner">
+    <a class="wordmark" href="index.html"><span class="monogram">JC</span><span>JAYDEN CHO<br>THE PERSONAL EDITION</span></a>
+    <a class="back" href="index.html">← Back to main page</a>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="head"><p class="eyebrow">Jayden Cho</p><h1>Photo Gallery</h1></div>
+  <div class="grid" id="grid"></div>
+</main>
+
+<dialog class="viewer" id="viewer">
+  <span class="count" id="count"></span>
+  <img id="viewer-img" alt="">
+  <button class="close" id="close" type="button">Close ×</button>
+  <button class="prev" id="prev" type="button">← Previous</button>
+  <button class="next" id="next" type="button">Next →</button>
+</dialog>
+
+<script>
+/*
+  HOW TO ADD OR REMOVE PHOTOS
+  Upload image files (.jpg, .jpeg, .png, .webp, .gif) into the  images/gallery  folder,
+  or delete them from it. This page finds them automatically — no code to edit.
+  Photos show in filename order, so names like 07-hike.jpg, 08-concert.jpg set the order.
+*/
+const REPO = 'jaydencho08/jaydencho08.github.io';
+const FOLDER = 'images/gallery';
+
+// Backup list, only used if GitHub can't be reached (e.g. previewing on your own computer).
+const BACKUP = ['01-rover.jpg', '02-research.jpg', '03-classroom.jpg', '04-board.jpg', '05-award.jpg', '06-team.jpg'];
+
+const grid = document.getElementById('grid');
+const viewer = document.getElementById('viewer');
+const viewerImg = document.getElementById('viewer-img');
+const count = document.getElementById('count');
+let photos = [];
+let current = 0;
+
+async function loadPhotos() {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/contents/${FOLDER}`);
+    if (!res.ok) throw new Error(res.status);
+    const files = await res.json();
+    return files
+      .filter(f => f.type === 'file' && /\.(jpe?g|png|webp|gif|avif)$/i.test(f.name))
+      .map(f => f.name)
+      .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  } catch {
+    return BACKUP;
+  }
+}
+
+function show(i) {
+  current = (i + photos.length) % photos.length;
+  viewerImg.src = `${FOLDER}/${photos[current]}`;
+  count.textContent = `PHOTO ${current + 1} / ${photos.length}`;
+}
+
+loadPhotos().then(list => {
+  photos = list;
+  if (!photos.length) { grid.innerHTML = '<p class="empty">No photos yet.</p>'; return; }
+  photos.forEach((name, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.setAttribute('aria-label', `Open photo ${i + 1}`);
+    const img = document.createElement('img');
+    img.src = `${FOLDER}/${name}`;
+    img.alt = '';
+    img.loading = 'lazy';
+    btn.appendChild(img);
+    btn.addEventListener('click', () => { show(i); viewer.showModal(); });
+    grid.appendChild(btn);
+  });
+});
+
+document.getElementById('close').onclick = () => viewer.close();
+document.getElementById('prev').onclick = () => show(current - 1);
+document.getElementById('next').onclick = () => show(current + 1);
+viewer.addEventListener('click', e => { if (e.target === viewer) viewer.close(); });
+document.addEventListener('keydown', e => {
+  if (!viewer.open) return;
+  if (e.key === 'ArrowRight') show(current + 1);
+  if (e.key === 'ArrowLeft') show(current - 1);
+});
+</script>
+</body>
+</html>
