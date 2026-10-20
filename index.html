@@ -334,10 +334,15 @@ void main(){vec2 q=vec2(gl_FragCoord.x/u_dpr,u_size.y-gl_FragCoord.y/u_dpr);floa
 const glyphVertex=`precision highp float;
 attribute vec2 a_position;attribute vec3 a_color;attribute float a_char;attribute float a_seed;
 uniform vec2 u_size;uniform float u_dpr;uniform float u_point;uniform float u_progress;
-uniform vec4 u_wake[8];uniform float u_motion;
+uniform vec4 u_wake[16];uniform float u_motion;
 varying vec3 v_color;varying float v_char;varying float v_alpha;
 void main(){vec2 q=a_position;vec2 displacement=vec2(0.);float light=0.;float stir=0.;float phase=0.;
- for(int i=0;i<8;i++){vec4 w=u_wake[i];vec2 delta=q-w.xy;float distance=length(delta);float radius=clamp(u_size.x*.07,50.,95.);float envelope=exp(-distance*distance/(radius*radius))*exp(-w.z*2.2)*w.w;float ripple=sin(w.z*8.-distance*.036);vec2 direction=delta/max(distance,1.);displacement+=(direction*ripple+vec2(-direction.y,direction.x)*.35)*envelope*11.;light+=envelope*.11;stir+=envelope;phase+=envelope*w.z;}
+ for(int i=0;i<16;i++){vec4 w=u_wake[i];vec2 delta=q-w.xy;float distance=length(delta);float radius=clamp(u_size.x*.07,50.,95.);float falloff=exp(-distance*distance/(radius*radius));
+  // Bounce: heavily damped so it settles quickly instead of wobbling at the end.
+  float envelope=falloff*exp(-w.z*4.)*w.w*step(w.z,1.2);float ripple=sin(w.z*5.-distance*.036);vec2 direction=delta/max(distance,1.);displacement+=(direction*ripple+vec2(-direction.y,direction.x)*.35)*envelope*11.;light+=envelope*.11;
+  // Symbol swap: lingers for a few seconds, then eases back to the original glyphs.
+  float linger=falloff*max(w.w,.6)*(1.-smoothstep(2.6,4.2,w.z));stir+=linger;phase+=linger*w.z;}
+ q+=displacement*u_motion;
  float p=u_progress;float coast=u_size.y*(1.-p);
  // Scroll sweep: the ASCII clears from right to left, with a slightly ragged edge.
  float sweep=u_size.x*(1.08-1.5*p)+(a_seed-.5)*50.;
@@ -349,8 +354,8 @@ void main(){vec2 q=a_position;vec2 displacement=vec2(0.);float light=0.;float st
  if(u_size.x<700.)shade=.38+.62*smoothstep(u_size.y*.35,u_size.y*.66,a_position.y);
  // Under the cursor, glyphs swap to other symbols and flicker, then settle back as the wake fades.
  float swap=step(.18+a_seed*.35,stir*u_motion);
- float shift=1.+floor(fract(a_seed*17.31+phase*2.6)*8.);
-float gray=dot(a_color,vec3(.22,.64,.14));v_color=a_color;v_alpha=alpha*shade;v_char=mod(a_char+shift*swap,9.);
+ float shift=1.+floor(fract(a_seed*17.31+phase*.9)*8.);
+float gray=dot(a_color,vec3(.22,.64,.14));v_color=a_color*(1.+min(light,.16));v_alpha=alpha*shade;v_char=mod(a_char+shift*swap,9.);
  gl_Position=vec4(q.x/u_size.x*2.-1.,1.-q.y/u_size.y*2.,0.,1.);gl_PointSize=u_point*u_dpr;
 }`;
 const glyphFragment=`precision mediump float;uniform sampler2D u_atlas;varying vec3 v_color;varying float v_char;varying float v_alpha;
@@ -412,7 +417,7 @@ function buildArt(){
 function drawArt(time){
   if(!artReady)return;
   const p=motion?scrollProgress:0;
-  while(wake.length&&time-wake[wake.length-1].t>1800)wake.pop();
+  while(wake.length&&time-wake[wake.length-1].t>4300)wake.pop();
   if(gl){
     gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(gpu.background);gl.bindBuffer(gl.ARRAY_BUFFER,gpu.quad);
@@ -422,7 +427,7 @@ function drawArt(time){
     gl.useProgram(gpu.glyph);gl.bindBuffer(gl.ARRAY_BUFFER,gpu.vertices);
     const sizes=[2,3,1,1],offsets=[0,8,20,24];gpu.attributes.forEach((a,i)=>{gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,sizes[i],gl.FLOAT,false,28,offsets[i]);});
     gl.uniform2f(gpu.glyphU.u_size,width,height);gl.uniform1f(gpu.glyphU.u_progress,p);gl.uniform1f(gpu.glyphU.u_dpr,dpr);gl.uniform1f(gpu.glyphU.u_point,glyphSize);gl.uniform1f(gpu.glyphU.u_motion,motion?1:0);
-    const wakes=new Float32Array(32);for(let i=0;i<8;i++){const w=wake[i];if(w){wakes[i*4]=w.x;wakes[i*4+1]=w.y;wakes[i*4+2]=Math.max(0,(time-w.t)/1000);wakes[i*4+3]=w.strength;}}
+    const wakes=new Float32Array(64);for(let i=0;i<16;i++){const w=wake[i];if(w){wakes[i*4]=w.x;wakes[i*4+1]=w.y;wakes[i*4+2]=Math.max(0,(time-w.t)/1000);wakes[i*4+3]=w.strength;}}
     gl.uniform4fv(gpu.glyphU["u_wake[0]"],wakes);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,gpu.atlas);gl.uniform1i(gpu.glyphU.u_atlas,0);gl.drawArrays(gl.POINTS,0,points.length/7);
   } else if(ctx){
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);if(p>=1)return;
@@ -430,7 +435,8 @@ function drawArt(time){
     ctx.lineTo(width,height*(1-p));ctx.lineTo(0,height*(1-p));
     ctx.closePath();ctx.clip();ctx.fillStyle="#071d33";ctx.fillRect(0,0,width,height);
     if(p>0){ctx.beginPath();ctx.rect(0,0,Math.max(0,width*(1.08-1.5*p)),height);ctx.clip();}
-    ctx.drawImage(fallback,0,0,width,height);
+    const tile=20;
+    for(let y=0;y<height;y+=tile)for(let x=0;x<width;x+=tile){let dx=0,dy=0;for(const w of wake){const age=(time-w.t)/1000;if(age>1.2)continue;const d=Math.hypot(x-w.x,y-w.y),f=Math.exp(-d*d/6000)*Math.exp(-age*4)*w.strength;dx+=Math.sin(age*5-d*.036)*f*8;dy+=Math.cos(age*5-d*.036)*f*5;}const tw=Math.min(tile,width-x),th=Math.min(tile,height-y);ctx.drawImage(fallback,x*dpr,y*dpr,tw*dpr,th*dpr,x+dx,y+dy,tw+.5,th+.5);}
     ctx.restore();
   }
 }
@@ -469,9 +475,9 @@ document.addEventListener("visibilitychange",()=>{if(document.hidden){cancelAnim
 let previousPointer=null;
 addEventListener("pointermove",e=>{
   if(e.pointerType!=="mouse"||!motion||!heroVisible)return;
-  const t=performance.now();if(previousPointer&&t-previousPointer.t<26)return;
+  const t=performance.now();if(previousPointer&&t-previousPointer.t<45)return;
   const speed=previousPointer?Math.hypot(e.clientX-previousPointer.x,e.clientY-previousPointer.y)/Math.max(1,t-previousPointer.t):.3;
-  const w={x:e.clientX,y:e.clientY,t,strength:clamp(.25+speed*.38,.25,1)};wake.unshift(w);wake.length=Math.min(wake.length,8);previousPointer=w;requestTick();
+  const w={x:e.clientX,y:e.clientY,t,strength:clamp(.25+speed*.38,.25,1)};wake.unshift(w);wake.length=Math.min(wake.length,16);previousPointer=w;requestTick();
 },{passive:true});
 document.addEventListener("pointerleave",()=>{previousPointer=null;});
 if(matchMedia("(pointer:coarse)").matches)$(".pointer-note").textContent="Scroll gently. Follow the current.";
