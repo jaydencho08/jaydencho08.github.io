@@ -330,23 +330,26 @@ const bgVertex=`attribute vec2 a_position;void main(){gl_Position=vec4(a_positio
 const bgFragment=`precision mediump float;
 uniform vec2 u_size;uniform float u_progress;uniform float u_dpr;uniform sampler2D u_image;uniform vec4 u_art;
 float coast(float x){float p=u_progress;return u_size.y*(1.-p)+sin(3.14159*p)*(sin(x/u_size.x*5.+p*4.)*38.+sin(x/u_size.x*12.-p*3.)*13.);}
-void main(){vec2 q=vec2(gl_FragCoord.x/u_dpr,u_size.y-gl_FragCoord.y/u_dpr);float a=1.-smoothstep(coast(q.x)-13.,coast(q.x)+25.,q.y);if(u_progress<.001)a=1.;if(u_progress>=1.)a=0.;vec3 col=mix(vec3(.027,.092,.155),vec3(.025,.115,.19),q.x/u_size.x);vec2 uv=(q-u_art.xy)/u_art.zw;float edge=smoothstep(0.,.025,uv.x)*smoothstep(0.,.025,uv.y)*(1.-smoothstep(.975,1.,uv.x))*(1.-smoothstep(.975,1.,uv.y));float shade=.08+.92*smoothstep(u_size.x*.26,u_size.x*.72,q.x);if(u_size.x<700.)shade=.1+.9*smoothstep(u_size.y*.42,u_size.y*.7,q.y);vec3 pigment=texture2D(u_image,uv).rgb;float gray=dot(pigment,vec3(.22,.64,.14));pigment=mix(vec3(gray),pigment,1.);col=mix(col,pigment,.04*edge*shade);gl_FragColor=vec4(col,a);}`;
+void main(){vec2 q=vec2(gl_FragCoord.x/u_dpr,u_size.y-gl_FragCoord.y/u_dpr);float a=1.-smoothstep(coast(q.x)-6.,coast(q.x)+6.,q.y);if(u_progress<.001)a=1.;if(u_progress>=1.)a=0.;vec3 col=mix(vec3(.027,.092,.155),vec3(.025,.115,.19),q.x/u_size.x);vec2 uv=(q-u_art.xy)/u_art.zw;float edge=smoothstep(0.,.025,uv.x)*smoothstep(0.,.025,uv.y)*(1.-smoothstep(.975,1.,uv.x))*(1.-smoothstep(.975,1.,uv.y));float shade=.08+.92*smoothstep(u_size.x*.26,u_size.x*.72,q.x);if(u_size.x<700.)shade=.1+.9*smoothstep(u_size.y*.42,u_size.y*.7,q.y);vec3 pigment=texture2D(u_image,uv).rgb;float gray=dot(pigment,vec3(.22,.64,.14));pigment=mix(vec3(gray),pigment,1.);col=mix(col,pigment,.04*edge*shade);gl_FragColor=vec4(col,a);}`;
 const glyphVertex=`precision highp float;
 attribute vec2 a_position;attribute vec3 a_color;attribute float a_char;attribute float a_seed;
 uniform vec2 u_size;uniform float u_dpr;uniform float u_point;uniform float u_progress;
 uniform vec4 u_wake[8];uniform float u_motion;
 varying vec3 v_color;varying float v_char;varying float v_alpha;
-void main(){vec2 q=a_position;vec2 displacement=vec2(0.);float light=0.;
- for(int i=0;i<8;i++){vec4 w=u_wake[i];vec2 delta=q-w.xy;float distance=length(delta);float radius=clamp(u_size.x*.115,80.,155.);float envelope=exp(-distance*distance/(radius*radius))*exp(-w.z*2.2)*w.w;float ripple=sin(w.z*8.-distance*.036);vec2 direction=delta/max(distance,1.);displacement+=(direction*ripple+vec2(-direction.y,direction.x)*.35)*envelope*11.;light+=envelope*.11;}
+void main(){vec2 q=a_position;vec2 displacement=vec2(0.);float light=0.;float stir=0.;float phase=0.;
+ for(int i=0;i<8;i++){vec4 w=u_wake[i];vec2 delta=q-w.xy;float distance=length(delta);float radius=clamp(u_size.x*.07,50.,95.);float envelope=exp(-distance*distance/(radius*radius))*exp(-w.z*2.2)*w.w;float ripple=sin(w.z*8.-distance*.036);vec2 direction=delta/max(distance,1.);displacement+=(direction*ripple+vec2(-direction.y,direction.x)*.35)*envelope*11.;light+=envelope*.11;stir+=envelope;phase+=envelope*w.z;}
  q+=displacement*u_motion;
  float p=u_progress;float coast=u_size.y*(1.-p)+sin(3.14159*p)*(sin(a_position.x/u_size.x*5.+p*4.)*38.+sin(a_position.x/u_size.x*12.-p*3.)*13.);
- float release=smoothstep(coast-92.,coast+68.,a_position.y)*sin(3.14159*p);
- q.x+=release*(28.+sin(a_seed*9.+p*7.)*26.);q.y+=release*(35.+a_seed*44.);
- float alpha=1.-smoothstep(coast-18.,coast+88.,a_position.y);
+ float release=smoothstep(coast-60.,coast+20.,a_position.y)*sin(3.14159*p);
+ q.x+=release*(10.+sin(a_seed*9.+p*7.)*8.);q.y+=release*(12.+a_seed*14.);
+ float alpha=1.-smoothstep(coast-34.,coast+4.,q.y);
  if(p<.001)alpha=1.;if(p>=1.)alpha=0.;
  float shade=.06+.94*smoothstep(u_size.x*.22,u_size.x*.75,a_position.x);
  if(u_size.x<700.)shade=.38+.62*smoothstep(u_size.y*.35,u_size.y*.66,a_position.y);
-float gray=dot(a_color,vec3(.22,.64,.14));v_color=a_color*(1.+min(light,.16));v_alpha=alpha*shade;v_char=a_char;
+ // Under the cursor, glyphs swap to other symbols and flicker, then settle back as the wake fades.
+ float swap=step(.18+a_seed*.35,stir*u_motion);
+ float shift=1.+floor(fract(a_seed*17.31+phase*2.6)*8.);
+float gray=dot(a_color,vec3(.22,.64,.14));v_color=a_color*(1.+min(light,.16));v_alpha=alpha*shade;v_char=mod(a_char+shift*swap,9.);
  gl_Position=vec4(q.x/u_size.x*2.-1.,1.-q.y/u_size.y*2.,0.,1.);gl_PointSize=u_point*u_dpr;
 }`;
 const glyphFragment=`precision mediump float;uniform sampler2D u_atlas;varying vec3 v_color;varying float v_char;varying float v_alpha;
@@ -426,7 +429,7 @@ function drawArt(time){
     for(let x=width;x>=0;x-=8){const y=height*(1-p)+Math.sin(Math.PI*p)*(Math.sin(x/width*5+p*4)*38+Math.sin(x/width*12-p*3)*13);ctx.lineTo(x,y);}
     ctx.closePath();ctx.clip();ctx.fillStyle="#071d33";ctx.fillRect(0,0,width,height);
     const tile=20;
-    for(let y=0;y<height;y+=tile)for(let x=0;x<width;x+=tile){let dx=0,dy=0;for(const w of wake){const age=(time-w.t)/1000,d=Math.hypot(x-w.x,y-w.y),f=Math.exp(-d*d/16000)*Math.exp(-age*2.2)*w.strength;dx+=Math.sin(age*8-d*.036)*f*8;dy+=Math.cos(age*8-d*.036)*f*5;}const tw=Math.min(tile,width-x),th=Math.min(tile,height-y);ctx.drawImage(fallback,x*dpr,y*dpr,tw*dpr,th*dpr,x+dx,y+dy,tw+.5,th+.5);}
+    for(let y=0;y<height;y+=tile)for(let x=0;x<width;x+=tile){let dx=0,dy=0;for(const w of wake){const age=(time-w.t)/1000,d=Math.hypot(x-w.x,y-w.y),f=Math.exp(-d*d/6000)*Math.exp(-age*2.2)*w.strength;dx+=Math.sin(age*8-d*.036)*f*8;dy+=Math.cos(age*8-d*.036)*f*5;}const tw=Math.min(tile,width-x),th=Math.min(tile,height-y);ctx.drawImage(fallback,x*dpr,y*dpr,tw*dpr,th*dpr,x+dx,y+dy,tw+.5,th+.5);}
     ctx.restore();
   }
 }
